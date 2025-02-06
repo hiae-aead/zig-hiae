@@ -47,7 +47,7 @@ fn HiaeX(comptime degree: u7) type {
             x.* = AesBlockX.fromBytes(&pad);
         }
 
-        inline fn absorb_broadcast(self: *Self, m: AesBlockX) void {
+        inline fn absorbBroadcast(self: *Self, m: AesBlockX) void {
             @setEvalBranchQuota(10000);
             const s = &self.s;
             for (0..2) |_| {
@@ -191,7 +191,7 @@ fn HiaeX(comptime degree: u7) type {
             if (degree > 1) {
                 for (&self.s) |*x| x.* = x.*.xorBlocks(ctx_v);
             }
-            self.absorb_broadcast(c0_v);
+            self.absorbBroadcast(c0_v);
             self.s[0] = self.s[0].xorBlocks(k0_v);
             self.s[7] = self.s[7].xorBlocks(k1_v);
 
@@ -207,7 +207,7 @@ fn HiaeX(comptime degree: u7) type {
                 b[i * 16 ..][0..16].* = b[0..16].*;
             }
             const t = AesBlockX.fromBytes(&b);
-            self.absorb_broadcast(t);
+            self.absorbBroadcast(t);
             var tag_multi = s[0];
             for (s[1..]) |x| tag_multi = tag_multi.xorBlocks(x);
             const tag_multi_bytes = tag_multi.toBytes();
