@@ -27,3 +27,17 @@ A Zig implementation of HiAE, along with support for parallel variants.
 | HiAE    |   9.2 Gb/s |
 | HiAEX2  |  11.0 Gb/s |
 | HiAEX4  |   7.7 Gb/s |
+
+## Circuits
+
+### Absorption
+
+![Absorption in HiAE](.media/s1.png)
+
+### Encryption
+
+![Encryption in HiAE](.media/s2.png)
+
+### Inversion
+
+![Inversion in HiAE](.media/s3.png)
