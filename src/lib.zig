@@ -220,6 +220,33 @@ fn HiaeX(comptime degree: u7) type {
             return tag;
         }
 
+        fn finalizeMac(self: *Self, data_len: usize) [tag_length]u8 {
+            var s = &self.s;
+            var b: [blockx_length]u8 = undefined;
+            mem.writeInt(u64, b[0..8], @as(u64, data_len) * 8, .little);
+            mem.writeInt(u64, b[8..16], tag_length * 8, .little);
+            for (1..degree) |i| {
+                b[i * 16 ..][0..16].* = b[0..16].*;
+            }
+            self.absorbBroadcast(AesBlockX.fromBytes(&b));
+            var tag_multi = s[0];
+            for (s[1..]) |x| tag_multi = tag_multi.xorBlocks(x);
+            const tag_multi_bytes = tag_multi.toBytes();
+            var v = [_]u8{0} ** blockx_length;
+            for (1..degree) |d| {
+                v[0..16].* = tag_multi_bytes[d * 16 ..][0..16].*;
+                self.absorbOne(&v);
+            }
+            if (degree > 1) {
+                mem.writeInt(u64, b[0..8], degree, .little);
+                mem.writeInt(u64, b[8..16], tag_length * 8, .little);
+                self.absorbBroadcast(AesBlockX.fromBytes(&b));
+            }
+            tag_multi = s[0];
+            for (s[1..]) |x| tag_multi = tag_multi.xorBlocks(x);
+            return tag_multi.toBytes()[0..tag_length].*;
+        }
+
         pub fn encrypt(
             ct: []u8,
             msg: []const u8,
@@ -304,6 +331,30 @@ fn HiaeX(comptime degree: u7) type {
                 crypto.utils.secureZero(u8, msg);
                 return error.AuthenticationFailed;
             }
+        }
+
+        pub fn mac(
+            data: []const u8,
+            key: [key_length]u8,
+            nonce: [nonce_length]u8,
+        ) [tag_length]u8 {
+            assert(data.len <= ad_max_length);
+            var hiae = init(key, nonce);
+
+            var i: usize = 0;
+            while (i + rate <= data.len) : (i += rate) {
+                hiae.absorb(data[i..][0..rate]);
+            }
+            while (i + blockx_length <= data.len) : (i += blockx_length) {
+                hiae.absorbOne(data[i..][0..blockx_length]);
+            }
+            const left = data.len % blockx_length;
+            if (left > 0) {
+                var pad = [_]u8{0} ** blockx_length;
+                @memcpy(pad[0..left], data[i..]);
+                hiae.absorbOne(&pad);
+            }
+            return hiae.finalizeMac(data.len);
         }
     };
 }
