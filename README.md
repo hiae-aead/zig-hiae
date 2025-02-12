@@ -39,6 +39,7 @@ A Zig implementation of HiAE, along with support for parallel variants.
 | HiAE-MAC   | 315.8 Gb/s |
 | HiAEX2-MAC | 530.4 Gb/s |
 | HiAEX4-MAC | 522.2 Gb/s |
+| LeMAC      | 345.0 Gb/s |
 
 #### Apple M1
 
@@ -47,6 +48,7 @@ A Zig implementation of HiAE, along with support for parallel variants.
 | HiAE-MAC   | 163.1 Gb/s |
 | HiAEX2-MAC | 182.9 Gb/s |
 | HiAEX4-MAC | 138.8 Gb/s |
+| LeMAC      | 219.2 Gb/s |
 
 #### WebAssembly (lime1+simd128)
 
@@ -55,6 +57,8 @@ A Zig implementation of HiAE, along with support for parallel variants.
 | HiAE    |   9.8 Gb/s |
 | HiAEX2  |  12.0 Gb/s |
 | HiAEX4  |   7.7 Gb/s |
+| LeMAC   |  10.0 Gb/s |
+
 
 ## Circuits
 

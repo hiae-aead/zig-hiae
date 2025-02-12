@@ -60,6 +60,34 @@ fn benchHiaeMac(desc: []const u8, comptime Aead: type) !void {
     try stdout.print("{s}\t{d:10.1} Gb/s\n", .{ desc, throughput });
 }
 
+fn benchLeMac() !void {
+    const LeMac = @import("lemac/lemac.zig").LeMac;
+
+    var key: [LeMac.key_len]u8 = undefined;
+    var nonce: [LeMac.nonce_len]u8 = undefined;
+    var data: [msg_len]u8 = undefined;
+
+    random.bytes(&key);
+    random.bytes(&nonce);
+    random.bytes(&data);
+
+    const st = LeMac.init(key);
+
+    var timer = try Timer.start();
+    const start = timer.lap();
+    for (0..iterations) |_| {
+        const tag = st.mac(&data, nonce);
+        data[0] ^= tag[0];
+    }
+    const end = timer.read();
+    mem.doNotOptimizeAway(data[0]);
+    const bits: f128 = @floatFromInt(@as(u128, msg_len) * iterations * 8);
+    const elapsed_s = @as(f128, @floatFromInt(end - start)) / time.ns_per_s;
+    const throughput = @as(f64, @floatCast(bits / (elapsed_s * 1000_000_000)));
+    const stdout = std.io.getStdOut().writer();
+    try stdout.print("LeMAC\t{d:10.1} Gb/s\n", .{throughput});
+}
+
 pub fn main() !void {
     try benchHiae("HiAE", hiae.Hiae);
     try benchHiae("HiAEX2", hiae.HiaeX2);
@@ -68,4 +96,5 @@ pub fn main() !void {
     try benchHiaeMac("HiAE-MAC", hiae.Hiae);
     try benchHiaeMac("HiAEX2-MAC", hiae.HiaeX2);
     try benchHiaeMac("HiAEX4-MAC", hiae.HiaeX4);
+    try benchLeMac();
 }
