@@ -32,7 +32,7 @@ A Zig implementation of HiAE, along with support for parallel variants.
 
 #### MAC
 
-#### Zen4
+#### Zen4 (likely limited by the memory bandwidth)
 
 | Variant    | Throughput |
 | :--------- | ---------: |
