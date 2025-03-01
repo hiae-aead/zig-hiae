@@ -1,7 +1,8 @@
 .{
-    .name = "hiae",
+    .name = .hiae,
     .version = "0.0.0",
-    .minimum_zig_version = "0.13.0",
+    .minimum_zig_version = "0.14.0",
+    .fingerprint = 0xd9ee3f6e5a9eb4f4,
 
     .dependencies = .{},
 
