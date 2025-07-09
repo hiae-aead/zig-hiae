@@ -1,3 +1,5 @@
+//! Simple HiAE implementation without parallelism.
+
 const std = @import("std");
 const assert = std.debug.assert;
 const crypto = std.crypto;
@@ -32,16 +34,40 @@ inline fn rol(self: *Self) void {
     s[s.len - 1] = t;
 }
 
-inline fn absorbBroadcast(self: *Self, m: AesBlock) void {
+inline fn round(self: *Self, comptime i: u4, a: AesBlock) void {
+    const s = &self.s;
+    const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), a);
+    s[0 +% i] = aesround(s[13 +% i], t);
+    s[3 +% i] = s[3 +% i].xorBlocks(a);
+    s[13 +% i] = s[13 +% i].xorBlocks(a);
+}
+
+inline fn eRound(self: *Self, comptime i: u4, m: AesBlock) AesBlock {
+    const s = &self.s;
+    const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), m);
+    const c = t.xorBlocks(s[9 +% i]);
+    s[0 +% i] = aesround(s[13 +% i], t);
+    s[3 +% i] = s[3 +% i].xorBlocks(m);
+    s[13 +% i] = s[13 +% i].xorBlocks(m);
+    return c;
+}
+
+inline fn dRound(self: *Self, comptime i: u4, c: AesBlock) AesBlock {
+    const s = &self.s;
+    const t = c.xorBlocks(s[9 +% i]);
+    const m = aesround(s[0 +% i].xorBlocks(s[1 +% i]), t);
+    s[0 +% i] = aesround(s[13 +% i], t);
+    s[3 +% i] = s[3 +% i].xorBlocks(m);
+    s[13 +% i] = s[13 +% i].xorBlocks(m);
+    return m;
+}
+
+inline fn diffusionRounds(self: *Self, m: AesBlock) void {
     @setEvalBranchQuota(10000);
     const s = &self.s;
     for (0..2) |_| {
-        inline for (0..s.len) |i_| {
-            const i: u4 = @intCast(i_);
-            const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), m);
-            s[0 +% i] = aesround(s[13 +% i], t);
-            s[3 +% i] = s[3 +% i].xorBlocks(m);
-            s[13 +% i] = s[13 +% i].xorBlocks(m);
+        inline for (0..s.len) |i| {
+            self.round(@intCast(i), m);
         }
     }
 }
@@ -49,74 +75,46 @@ inline fn absorbBroadcast(self: *Self, m: AesBlock) void {
 fn absorb(self: *Self, ai: *const [rate]u8) void {
     @setEvalBranchQuota(10000);
     const s = &self.s;
-    inline for (0..s.len) |i_| {
-        const i: u4 = @intCast(i_);
+    inline for (0..s.len) |i| {
         const m = AesBlock.fromBytes(ai[i * block_length ..][0..block_length]);
-        const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), m);
-        s[0 +% i] = aesround(s[13 +% i], t);
-        s[3 +% i] = s[3 +% i].xorBlocks(m);
-        s[13 +% i] = s[13 +% i].xorBlocks(m);
+        self.round(@intCast(i), m);
     }
 }
 
 fn absorbOne(self: *Self, ai: *const [block_length]u8) void {
-    const s = &self.s;
     const m = AesBlock.fromBytes(ai);
-    const t = aesround(s[0].xorBlocks(s[1]), m);
-    s[0] = aesround(s[13], t);
-    s[3] = s[3].xorBlocks(m);
-    s[13] = s[13].xorBlocks(m);
+    self.round(0, m);
     self.rol();
 }
 
-fn enc(self: *Self, ci: *[rate]u8, mi: *const [rate]u8) void {
+fn encBatch(self: *Self, ci: *[rate]u8, mi: *const [rate]u8) void {
     @setEvalBranchQuota(10000);
     const s = &self.s;
-    inline for (0..s.len) |i_| {
-        const i: u4 = @intCast(i_);
+    inline for (0..s.len) |i| {
         const m = AesBlock.fromBytes(mi[i * block_length ..][0..block_length]);
-        const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), m);
-        s[0 +% i] = aesround(s[13 +% i], t);
-        s[3 +% i] = s[3 +% i].xorBlocks(m);
-        s[13 +% i] = s[13 +% i].xorBlocks(m);
-        ci[i * block_length ..][0..block_length].* = s[9 +% i].xorBlocks(t).toBytes();
+        ci[i * block_length ..][0..block_length].* = self.eRound(@intCast(i), m).toBytes();
     }
 }
 
 fn encOne(self: *Self, ci: *[block_length]u8, mi: *const [block_length]u8) void {
-    const s = &self.s;
     const m = AesBlock.fromBytes(mi);
-    const t = aesround(s[0].xorBlocks(s[1]), m);
-    s[0] = aesround(s[13], t);
-    s[3] = s[3].xorBlocks(m);
-    s[13] = s[13].xorBlocks(m);
-    ci.* = s[9].xorBlocks(t).toBytes();
+    ci.* = self.eRound(0, m).toBytes();
     self.rol();
 }
 
-fn dec(self: *Self, mi: *[rate]u8, ci: *const [rate]u8) void {
+fn decBatch(self: *Self, mi: *[rate]u8, ci: *const [rate]u8) void {
     @setEvalBranchQuota(10000);
     const s = &self.s;
-    inline for (0..s.len) |i_| {
-        const i: u4 = @intCast(i_);
+    inline for (0..s.len) |i| {
         const c = AesBlock.fromBytes(ci[i * block_length ..][0..block_length]);
-        const t = s[9 +% i].xorBlocks(c);
-        const m = aesround(s[0 +% i].xorBlocks(s[1 +% i]), t);
-        s[0 +% i] = aesround(s[13 +% i], t);
-        s[3 +% i] = s[3 +% i].xorBlocks(m);
-        s[13 +% i] = s[13 +% i].xorBlocks(m);
+        const m = self.dRound(@intCast(i), c);
         mi[i * block_length ..][0..block_length].* = m.toBytes();
     }
 }
 
 fn decOne(self: *Self, mi: *[block_length]u8, ci: *const [block_length]u8) void {
-    const s = &self.s;
     const c = AesBlock.fromBytes(ci);
-    const t = s[9].xorBlocks(c);
-    const m = aesround(s[0].xorBlocks(s[1]), t);
-    s[0] = aesround(s[13], t);
-    s[3] = s[3].xorBlocks(m);
-    s[13] = s[13].xorBlocks(m);
+    const m = self.dRound(0, c);
     mi.* = m.toBytes();
     self.rol();
 }
@@ -129,11 +127,7 @@ fn decLast(self: *Self, mi: []u8, ci: []const u8) void {
     const ks_bytes = ks.toBytes();
     @memcpy(c_padded[ci.len..], ks_bytes[ci.len..]);
     const c = AesBlock.fromBytes(&c_padded);
-    const t = s[9].xorBlocks(c);
-    const m = aesround(s[0].xorBlocks(s[1]), t);
-    s[0] = aesround(s[13], t);
-    s[3] = s[3].xorBlocks(m);
-    s[13] = s[13].xorBlocks(m);
+    const m = self.dRound(0, c);
     const m_bytes = m.toBytes();
     @memcpy(mi, m_bytes[0..mi.len]);
     self.rol();
@@ -152,7 +146,7 @@ fn init(key: [key_length]u8, nonce: [nonce_length]u8) Self {
         nonce_v.xorBlocks(k1_v), zero_v,                  k1_v,    c0_v,
         c1_v,                    k1_v,                    zero_v,  c0_v.xorBlocks(c1_v),
     } };
-    self.absorbBroadcast(c0_v);
+    self.diffusionRounds(c0_v);
     self.s[9] = self.s[9].xorBlocks(k0_v);
     self.s[13] = self.s[13].xorBlocks(k1_v);
 
@@ -165,10 +159,14 @@ fn finalize(self: *Self, ad_len: usize, msg_len: usize) [tag_length]u8 {
     mem.writeInt(u64, b[0..8], @as(u64, ad_len) * 8, .little);
     mem.writeInt(u64, b[8..16], @as(u64, msg_len) * 8, .little);
     const t = AesBlock.fromBytes(&b);
-    self.absorbBroadcast(t);
+    self.diffusionRounds(t);
     var tag = s[0];
     for (s[1..]) |x| tag = tag.xorBlocks(x);
     return tag.toBytes();
+}
+
+fn finalizeMac(self: *Self, data_len: usize) [tag_length]u8 {
+    return self.finalize(data_len, 0);
 }
 
 pub fn encrypt(
@@ -200,7 +198,7 @@ pub fn encrypt(
 
     i = 0;
     while (i + rate <= msg.len) : (i += rate) {
-        hiae.enc(ct[i..][0..rate], msg[i..][0..rate]);
+        hiae.encBatch(ct[i..][0..rate], msg[i..][0..rate]);
     }
     while (i + block_length <= msg.len) : (i += block_length) {
         hiae.encOne(ct[i..][0..block_length], msg[i..][0..block_length]);
@@ -244,7 +242,7 @@ pub fn decrypt(
 
     i = 0;
     while (i + rate <= ct.len) : (i += rate) {
-        hiae.dec(msg[i..][0..rate], ct[i..][0..rate]);
+        hiae.decBatch(msg[i..][0..rate], ct[i..][0..rate]);
     }
     while (i + block_length <= ct.len) : (i += block_length) {
         hiae.decOne(msg[i..][0..block_length], ct[i..][0..block_length]);
@@ -281,5 +279,5 @@ pub fn mac(
         @memcpy(pad[0..left], data[i..]);
         hiae.absorbOne(&pad);
     }
-    return hiae.finalize(data.len, 0);
+    return hiae.finalizeMac(data.len);
 }

@@ -1,8 +1,10 @@
+//! HiAE ipmlementation with support for parallelism.
+//! Note that when degree=1, this is equivalent to the HiAE implementation in `hiae.zig`.
+
 const std = @import("std");
 const assert = std.debug.assert;
 const crypto = std.crypto;
 const mem = std.mem;
-const AesBlock = crypto.core.aes.Block;
 const AesBlockVec = crypto.core.aes.BlockVec;
 const AuthenticationError = std.crypto.errors.AuthenticationError;
 
@@ -38,16 +40,40 @@ pub fn HiaeX(comptime degree: u7) type {
             s[s.len - 1] = t;
         }
 
-        inline fn absorbBroadcast(self: *Self, m: AesBlockX) void {
+        inline fn round(self: *Self, comptime i: u4, a: AesBlockX) void {
+            const s = &self.s;
+            const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), a);
+            s[0 +% i] = aesround(s[13 +% i], t);
+            s[3 +% i] = s[3 +% i].xorBlocks(a);
+            s[13 +% i] = s[13 +% i].xorBlocks(a);
+        }
+
+        inline fn eRound(self: *Self, comptime i: u4, m: AesBlockX) AesBlockX {
+            const s = &self.s;
+            const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), m);
+            const c = t.xorBlocks(s[9 +% i]);
+            s[0 +% i] = aesround(s[13 +% i], t);
+            s[3 +% i] = s[3 +% i].xorBlocks(m);
+            s[13 +% i] = s[13 +% i].xorBlocks(m);
+            return c;
+        }
+
+        inline fn dRound(self: *Self, comptime i: u4, c: AesBlockX) AesBlockX {
+            const s = &self.s;
+            const t = c.xorBlocks(s[9 +% i]);
+            const m = aesround(s[0 +% i].xorBlocks(s[1 +% i]), t);
+            s[0 +% i] = aesround(s[13 +% i], t);
+            s[3 +% i] = s[3 +% i].xorBlocks(m);
+            s[13 +% i] = s[13 +% i].xorBlocks(m);
+            return m;
+        }
+
+        inline fn diffusionRounds(self: *Self, m: AesBlockX) void {
             @setEvalBranchQuota(10000);
             const s = &self.s;
             for (0..2) |_| {
-                inline for (0..s.len) |i_| {
-                    const i: u4 = @intCast(i_);
-                    const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), m);
-                    s[0 +% i] = aesround(s[13 +% i], t);
-                    s[3 +% i] = s[3 +% i].xorBlocks(m);
-                    s[13 +% i] = s[13 +% i].xorBlocks(m);
+                inline for (0..s.len) |i| {
+                    self.round(@intCast(i), m);
                 }
             }
         }
@@ -55,74 +81,46 @@ pub fn HiaeX(comptime degree: u7) type {
         fn absorb(self: *Self, ai: *const [rate]u8) void {
             @setEvalBranchQuota(10000);
             const s = &self.s;
-            inline for (0..s.len) |i_| {
-                const i: u4 = @intCast(i_);
+            inline for (0..s.len) |i| {
                 const m = AesBlockX.fromBytes(ai[i * blockx_length ..][0..blockx_length]);
-                const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), m);
-                s[0 +% i] = aesround(s[13 +% i], t);
-                s[3 +% i] = s[3 +% i].xorBlocks(m);
-                s[13 +% i] = s[13 +% i].xorBlocks(m);
+                self.round(@intCast(i), m);
             }
         }
 
         fn absorbOne(self: *Self, ai: *const [blockx_length]u8) void {
-            const s = &self.s;
             const m = AesBlockX.fromBytes(ai);
-            const t = aesround(s[0].xorBlocks(s[1]), m);
-            s[0] = aesround(s[13], t);
-            s[3] = s[3].xorBlocks(m);
-            s[13] = s[13].xorBlocks(m);
+            self.round(0, m);
             self.rol();
         }
 
-        fn enc(self: *Self, ci: *[rate]u8, mi: *const [rate]u8) void {
+        fn encBatch(self: *Self, ci: *[rate]u8, mi: *const [rate]u8) void {
             @setEvalBranchQuota(10000);
             const s = &self.s;
-            inline for (0..s.len) |i_| {
-                const i: u4 = @intCast(i_);
+            inline for (0..s.len) |i| {
                 const m = AesBlockX.fromBytes(mi[i * blockx_length ..][0..blockx_length]);
-                const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), m);
-                s[0 +% i] = aesround(s[13 +% i], t);
-                s[3 +% i] = s[3 +% i].xorBlocks(m);
-                s[13 +% i] = s[13 +% i].xorBlocks(m);
-                ci[i * blockx_length ..][0..blockx_length].* = s[9 +% i].xorBlocks(t).toBytes();
+                ci[i * blockx_length ..][0..blockx_length].* = self.eRound(@intCast(i), m).toBytes();
             }
         }
 
         fn encOne(self: *Self, ci: *[blockx_length]u8, mi: *const [blockx_length]u8) void {
-            const s = &self.s;
             const m = AesBlockX.fromBytes(mi);
-            const t = aesround(s[0].xorBlocks(s[1]), m);
-            s[0] = aesround(s[13], t);
-            s[3] = s[3].xorBlocks(m);
-            s[13] = s[13].xorBlocks(m);
-            ci.* = s[9].xorBlocks(t).toBytes();
+            ci.* = self.eRound(0, m).toBytes();
             self.rol();
         }
 
-        fn dec(self: *Self, mi: *[rate]u8, ci: *const [rate]u8) void {
+        fn decBatch(self: *Self, mi: *[rate]u8, ci: *const [rate]u8) void {
             @setEvalBranchQuota(10000);
             const s = &self.s;
-            inline for (0..s.len) |i_| {
-                const i: u4 = @intCast(i_);
+            inline for (0..s.len) |i| {
                 const c = AesBlockX.fromBytes(ci[i * blockx_length ..][0..blockx_length]);
-                const t = s[9 +% i].xorBlocks(c);
-                const m = aesround(s[0 +% i].xorBlocks(s[1 +% i]), t);
-                s[0 +% i] = aesround(s[13 +% i], t);
-                s[3 +% i] = s[3 +% i].xorBlocks(m);
-                s[13 +% i] = s[13 +% i].xorBlocks(m);
+                const m = self.dRound(@intCast(i), c);
                 mi[i * blockx_length ..][0..blockx_length].* = m.toBytes();
             }
         }
 
         fn decOne(self: *Self, mi: *[blockx_length]u8, ci: *const [blockx_length]u8) void {
-            const s = &self.s;
             const c = AesBlockX.fromBytes(ci);
-            const t = s[9].xorBlocks(c);
-            const m = aesround(s[0].xorBlocks(s[1]), t);
-            s[0] = aesround(s[13], t);
-            s[3] = s[3].xorBlocks(m);
-            s[13] = s[13].xorBlocks(m);
+            const m = self.dRound(0, c);
             mi.* = m.toBytes();
             self.rol();
         }
@@ -135,11 +133,7 @@ pub fn HiaeX(comptime degree: u7) type {
             const ks_bytes = ks.toBytes();
             @memcpy(c_padded[ci.len..], ks_bytes[ci.len..]);
             const c = AesBlockX.fromBytes(&c_padded);
-            const t = s[9].xorBlocks(c);
-            const m = aesround(s[0].xorBlocks(s[1]), t);
-            s[0] = aesround(s[13], t);
-            s[3] = s[3].xorBlocks(m);
-            s[13] = s[13].xorBlocks(m);
+            const m = self.dRound(0, c);
             const m_bytes = m.toBytes();
             @memcpy(mi, m_bytes[0..mi.len]);
             self.rol();
@@ -169,7 +163,7 @@ pub fn HiaeX(comptime degree: u7) type {
             if (degree > 1) {
                 for (&self.s) |*x| x.* = x.*.xorBlocks(ctx_v);
             }
-            self.absorbBroadcast(c0_v);
+            self.diffusionRounds(c0_v);
             self.s[9] = self.s[9].xorBlocks(k0_v);
             self.s[13] = self.s[13].xorBlocks(k1_v);
 
@@ -185,7 +179,7 @@ pub fn HiaeX(comptime degree: u7) type {
                 b[i * 16 ..][0..16].* = b[0..16].*;
             }
             const t = AesBlockX.fromBytes(&b);
-            self.absorbBroadcast(t);
+            self.diffusionRounds(t);
             var tag_multi = s[0];
             for (s[1..]) |x| tag_multi = tag_multi.xorBlocks(x);
             const tag_multi_bytes = tag_multi.toBytes();
@@ -206,7 +200,7 @@ pub fn HiaeX(comptime degree: u7) type {
             for (1..degree) |i| {
                 b[i * 16 ..][0..16].* = b[0..16].*;
             }
-            self.absorbBroadcast(AesBlockX.fromBytes(&b));
+            self.diffusionRounds(AesBlockX.fromBytes(&b));
             var tag_multi = s[0];
             for (s[1..]) |x| tag_multi = tag_multi.xorBlocks(x);
             const tag_multi_bytes = tag_multi.toBytes();
@@ -218,7 +212,7 @@ pub fn HiaeX(comptime degree: u7) type {
             if (degree > 1) {
                 mem.writeInt(u64, b[0..8], degree, .little);
                 mem.writeInt(u64, b[8..16], tag_length * 8, .little);
-                self.absorbBroadcast(AesBlockX.fromBytes(&b));
+                self.diffusionRounds(AesBlockX.fromBytes(&b));
             }
             tag_multi = s[0];
             for (s[1..]) |x| tag_multi = tag_multi.xorBlocks(x);
@@ -254,7 +248,7 @@ pub fn HiaeX(comptime degree: u7) type {
 
             i = 0;
             while (i + rate <= msg.len) : (i += rate) {
-                hiae.enc(ct[i..][0..rate], msg[i..][0..rate]);
+                hiae.encBatch(ct[i..][0..rate], msg[i..][0..rate]);
             }
             while (i + blockx_length <= msg.len) : (i += blockx_length) {
                 hiae.encOne(ct[i..][0..blockx_length], msg[i..][0..blockx_length]);
@@ -298,7 +292,7 @@ pub fn HiaeX(comptime degree: u7) type {
 
             i = 0;
             while (i + rate <= ct.len) : (i += rate) {
-                hiae.dec(msg[i..][0..rate], ct[i..][0..rate]);
+                hiae.decBatch(msg[i..][0..rate], ct[i..][0..rate]);
             }
             while (i + blockx_length <= ct.len) : (i += blockx_length) {
                 hiae.decOne(msg[i..][0..blockx_length], ct[i..][0..blockx_length]);
