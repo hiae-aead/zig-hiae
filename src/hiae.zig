@@ -299,7 +299,3 @@ pub fn mac(
     }
     return hiae.finalize(data.len, 0);
 }
-
-test {
-    _ = @import("hiae_tests.zig");
-}

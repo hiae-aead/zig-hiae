@@ -71,7 +71,7 @@ test "HiAE test vectors" {
 
         var decrypted_buf: [1024]u8 = undefined;
         var decrypted = decrypted_buf[0..plaintext.len];
-        try Hiae.decrypt(&decrypted, ciphertext, ad, key, nonce);
+        try Hiae.decrypt(decrypted, ciphertext, tag, ad, key, nonce);
         try std.testing.expectEqualSlices(u8, plaintext[0..], decrypted[0..]);
     }
 }

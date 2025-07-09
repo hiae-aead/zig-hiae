@@ -6,7 +6,7 @@ const AesBlock = crypto.core.aes.Block;
 const AesBlockVec = crypto.core.aes.BlockVec;
 const AuthenticationError = std.crypto.errors.AuthenticationError;
 
-fn HiaeX(comptime degree: u7) type {
+pub fn HiaeX(comptime degree: u7) type {
     assert(degree > 0); // degree can't be 0
 
     return struct {
