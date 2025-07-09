@@ -115,8 +115,8 @@ fn decBatch(self: *Self, mi: *[rate]u8, ci: *const [rate]u8) void {
 fn dec(self: *Self, mi: *[block_length]u8, ci: *const [block_length]u8) void {
     const c = AesBlock.fromBytes(ci);
     const m = self.dRound(0, c);
-    mi.* = m.toBytes();
     self.rol();
+    mi.* = m.toBytes();
 }
 
 fn decPartial(self: *Self, mi: []u8, ci: []const u8) void {
@@ -128,9 +128,9 @@ fn decPartial(self: *Self, mi: []u8, ci: []const u8) void {
     @memcpy(c_padded[ci.len..], ks_bytes[ci.len..]);
     const c = AesBlock.fromBytes(&c_padded);
     const m = self.dRound(0, c);
+    self.rol();
     const m_bytes = m.toBytes();
     @memcpy(mi, m_bytes[0..mi.len]);
-    self.rol();
 }
 
 fn init(key: [key_length]u8, nonce: [nonce_length]u8) Self {
