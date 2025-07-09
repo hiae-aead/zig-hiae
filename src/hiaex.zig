@@ -100,13 +100,6 @@ pub fn HiaeX(comptime degree: u7) type {
             self.rol();
         }
 
-        fn encLast(self: *Self, ci: []u8, mi: []const u8) void {
-            var pad = [_]u8{0} ** blockx_length;
-            @memcpy(pad[0..mi.len], mi);
-            self.encOne(&pad, &pad);
-            @memcpy(ci, pad[0..ci.len]);
-        }
-
         fn dec(self: *Self, mi: *[rate]u8, ci: *const [rate]u8) void {
             @setEvalBranchQuota(10000);
             const s = &self.s;
@@ -267,7 +260,10 @@ pub fn HiaeX(comptime degree: u7) type {
                 hiae.encOne(ct[i..][0..blockx_length], msg[i..][0..blockx_length]);
             }
             if (msg.len % blockx_length > 0) {
-                hiae.encLast(ct[i..], msg[i..]);
+                var pad = [_]u8{0} ** blockx_length;
+                @memcpy(pad[0..msg[i..].len], msg[i..]);
+                hiae.encOne(&pad, &pad);
+                @memcpy(ct[i..], pad[0..ct[i..].len]);
             }
 
             return hiae.finalize(ad.len, msg.len);
