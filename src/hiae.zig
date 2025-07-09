@@ -32,12 +32,6 @@ inline fn rol(self: *Self) void {
     s[s.len - 1] = t;
 }
 
-inline fn truncateBlock(x: *AesBlock, len: usize) void {
-    var pad = [_]u8{0} ** block_length;
-    @memcpy(pad[0..len], x.toBytes()[0..len]);
-    x.* = AesBlock.fromBytes(&pad);
-}
-
 inline fn absorbBroadcast(self: *Self, m: AesBlock) void {
     @setEvalBranchQuota(10000);
     const s = &self.s;
@@ -101,18 +95,10 @@ fn encOne(self: *Self, ci: *[block_length]u8, mi: *const [block_length]u8) void 
 }
 
 fn encLast(self: *Self, ci: []u8, mi: []const u8) void {
-    const s = &self.s;
     var pad = [_]u8{0} ** block_length;
     @memcpy(pad[0..mi.len], mi);
-    const m = AesBlock.fromBytes(&pad);
-    var t = aesround(s[0].xorBlocks(s[1]), m);
-    truncateBlock(&t, mi.len);
-    s[0] = aesround(s[13], t);
-    s[3] = s[3].xorBlocks(m);
-    s[13] = s[13].xorBlocks(m);
-    const c = s[9].xorBlocks(t);
-    @memcpy(ci, c.toBytes()[0..ci.len]);
-    self.rol();
+    self.encOne(&pad, &pad);
+    @memcpy(ci, pad[0..ci.len]);
 }
 
 fn dec(self: *Self, mi: *[rate]u8, ci: *const [rate]u8) void {
@@ -144,17 +130,19 @@ fn decOne(self: *Self, mi: *[block_length]u8, ci: *const [block_length]u8) void 
 
 fn decLast(self: *Self, mi: []u8, ci: []const u8) void {
     const s = &self.s;
-    var pad = [_]u8{0} ** block_length;
-    @memcpy(pad[0..ci.len], ci);
-    const c = AesBlock.fromBytes(&pad);
-    var t = s[9].xorBlocks(c);
-    truncateBlock(&t, ci.len);
-    var m = aesround(s[0].xorBlocks(s[1]), t);
-    truncateBlock(&m, ci.len);
+    var c_padded = [_]u8{0} ** block_length;
+    @memcpy(c_padded[0..ci.len], ci);
+    const ks = aesround(s[0].xorBlocks(s[1]), AesBlock.fromBytes(&c_padded)).xorBlocks(s[9]);
+    const ks_bytes = ks.toBytes();
+    @memcpy(c_padded[ci.len..], ks_bytes[ci.len..]);
+    const c = AesBlock.fromBytes(&c_padded);
+    const t = s[9].xorBlocks(c);
+    const m = aesround(s[0].xorBlocks(s[1]), t);
     s[0] = aesround(s[13], t);
     s[3] = s[3].xorBlocks(m);
     s[13] = s[13].xorBlocks(m);
-    @memcpy(mi, m.toBytes()[0..mi.len]);
+    const m_bytes = m.toBytes();
+    @memcpy(mi, m_bytes[0..mi.len]);
     self.rol();
 }
 
