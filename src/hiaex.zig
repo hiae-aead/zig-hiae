@@ -125,7 +125,7 @@ pub fn HiaeX(comptime degree: u7) type {
             self.rol();
         }
 
-        fn decLast(self: *Self, mi: []u8, ci: []const u8) void {
+        fn decPartial(self: *Self, mi: []u8, ci: []const u8) void {
             const s = &self.s;
             var c_padded = [_]u8{0} ** blockx_length;
             @memcpy(c_padded[0..ci.len], ci);
@@ -298,7 +298,7 @@ pub fn HiaeX(comptime degree: u7) type {
                 hiae.dec(msg[i..][0..blockx_length], ct[i..][0..blockx_length]);
             }
             if (ct.len % blockx_length > 0) {
-                hiae.decLast(msg[i..], ct[i..]);
+                hiae.decPartial(msg[i..], ct[i..]);
             }
 
             const expected_tag = hiae.finalize(ad.len, msg.len);

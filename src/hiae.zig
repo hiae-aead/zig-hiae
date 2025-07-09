@@ -119,7 +119,7 @@ fn dec(self: *Self, mi: *[block_length]u8, ci: *const [block_length]u8) void {
     self.rol();
 }
 
-fn decLast(self: *Self, mi: []u8, ci: []const u8) void {
+fn decPartial(self: *Self, mi: []u8, ci: []const u8) void {
     const s = &self.s;
     var c_padded = [_]u8{0} ** block_length;
     @memcpy(c_padded[0..ci.len], ci);
@@ -248,7 +248,7 @@ pub fn decrypt(
         hiae.dec(msg[i..][0..block_length], ct[i..][0..block_length]);
     }
     if (ct.len % block_length > 0) {
-        hiae.decLast(msg[i..], ct[i..]);
+        hiae.decPartial(msg[i..], ct[i..]);
     }
 
     const expected_tag = hiae.finalize(ad.len, msg.len);
