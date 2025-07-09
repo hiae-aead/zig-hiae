@@ -72,7 +72,7 @@ inline fn diffusionRounds(self: *Self, m: AesBlock) void {
     }
 }
 
-fn absorb(self: *Self, ai: *const [rate]u8) void {
+fn absorbBatch(self: *Self, ai: *const [rate]u8) void {
     @setEvalBranchQuota(10000);
     const s = &self.s;
     inline for (0..s.len) |i| {
@@ -184,7 +184,7 @@ pub fn encrypt(
 
     var i: usize = 0;
     while (i + rate <= ad.len) : (i += rate) {
-        hiae.absorb(ad[i..][0..rate]);
+        hiae.absorbBatch(ad[i..][0..rate]);
     }
     while (i + block_length <= ad.len) : (i += block_length) {
         hiae.absorbOne(ad[i..][0..block_length]);
@@ -228,7 +228,7 @@ pub fn decrypt(
 
     var i: usize = 0;
     while (i + rate <= ad.len) : (i += rate) {
-        hiae.absorb(ad[i..][0..rate]);
+        hiae.absorbBatch(ad[i..][0..rate]);
     }
     while (i + block_length <= ad.len) : (i += block_length) {
         hiae.absorbOne(ad[i..][0..block_length]);
@@ -268,7 +268,7 @@ pub fn mac(
 
     var i: usize = 0;
     while (i + rate <= data.len) : (i += rate) {
-        hiae.absorb(data[i..][0..rate]);
+        hiae.absorbBatch(data[i..][0..rate]);
     }
     while (i + block_length <= data.len) : (i += block_length) {
         hiae.absorbOne(data[i..][0..block_length]);

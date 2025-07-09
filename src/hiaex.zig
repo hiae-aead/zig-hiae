@@ -78,7 +78,7 @@ pub fn HiaeX(comptime degree: u7) type {
             }
         }
 
-        fn absorb(self: *Self, ai: *const [rate]u8) void {
+        fn absorbBatch(self: *Self, ai: *const [rate]u8) void {
             @setEvalBranchQuota(10000);
             const s = &self.s;
             inline for (0..s.len) |i| {
@@ -234,7 +234,7 @@ pub fn HiaeX(comptime degree: u7) type {
 
             var i: usize = 0;
             while (i + rate <= ad.len) : (i += rate) {
-                hiae.absorb(ad[i..][0..rate]);
+                hiae.absorbBatch(ad[i..][0..rate]);
             }
             while (i + blockx_length <= ad.len) : (i += blockx_length) {
                 hiae.absorbOne(ad[i..][0..blockx_length]);
@@ -278,7 +278,7 @@ pub fn HiaeX(comptime degree: u7) type {
 
             var i: usize = 0;
             while (i + rate <= ad.len) : (i += rate) {
-                hiae.absorb(ad[i..][0..rate]);
+                hiae.absorbBatch(ad[i..][0..rate]);
             }
             while (i + blockx_length <= ad.len) : (i += blockx_length) {
                 hiae.absorbOne(ad[i..][0..blockx_length]);
@@ -318,7 +318,7 @@ pub fn HiaeX(comptime degree: u7) type {
 
             var i: usize = 0;
             while (i + rate <= data.len) : (i += rate) {
-                hiae.absorb(data[i..][0..rate]);
+                hiae.absorbBatch(data[i..][0..rate]);
             }
             while (i + blockx_length <= data.len) : (i += blockx_length) {
                 hiae.absorbOne(data[i..][0..blockx_length]);
