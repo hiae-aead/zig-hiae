@@ -42,7 +42,7 @@ inline fn update(self: *Self, comptime i: u4, a: AesBlock) void {
     s[13 +% i] = s[13 +% i].xorBlocks(a);
 }
 
-inline fn eUpdate(self: *Self, comptime i: u4, m: AesBlock) AesBlock {
+inline fn updateEnc(self: *Self, comptime i: u4, m: AesBlock) AesBlock {
     const s = &self.s;
     const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), m);
     const c = t.xorBlocks(s[9 +% i]);
@@ -52,7 +52,7 @@ inline fn eUpdate(self: *Self, comptime i: u4, m: AesBlock) AesBlock {
     return c;
 }
 
-inline fn dUpdate(self: *Self, comptime i: u4, c: AesBlock) AesBlock {
+inline fn updateDec(self: *Self, comptime i: u4, c: AesBlock) AesBlock {
     const s = &self.s;
     const t = c.xorBlocks(s[9 +% i]);
     const m = aesround(s[0 +% i].xorBlocks(s[1 +% i]), t);
@@ -92,13 +92,13 @@ fn encBatch(self: *Self, ci: *[rate]u8, mi: *const [rate]u8) void {
     const s = &self.s;
     inline for (0..s.len) |i| {
         const m = AesBlock.fromBytes(mi[i * block_length ..][0..block_length]);
-        ci[i * block_length ..][0..block_length].* = self.eUpdate(@intCast(i), m).toBytes();
+        ci[i * block_length ..][0..block_length].* = self.updateEnc(@intCast(i), m).toBytes();
     }
 }
 
 fn enc(self: *Self, ci: *[block_length]u8, mi: *const [block_length]u8) void {
     const m = AesBlock.fromBytes(mi);
-    ci.* = self.eUpdate(0, m).toBytes();
+    ci.* = self.updateEnc(0, m).toBytes();
     self.rol();
 }
 
@@ -107,14 +107,14 @@ fn decBatch(self: *Self, mi: *[rate]u8, ci: *const [rate]u8) void {
     const s = &self.s;
     inline for (0..s.len) |i| {
         const c = AesBlock.fromBytes(ci[i * block_length ..][0..block_length]);
-        const m = self.dUpdate(@intCast(i), c);
+        const m = self.updateDec(@intCast(i), c);
         mi[i * block_length ..][0..block_length].* = m.toBytes();
     }
 }
 
 fn dec(self: *Self, mi: *[block_length]u8, ci: *const [block_length]u8) void {
     const c = AesBlock.fromBytes(ci);
-    const m = self.dUpdate(0, c);
+    const m = self.updateDec(0, c);
     self.rol();
     mi.* = m.toBytes();
 }
@@ -127,7 +127,7 @@ fn decPartial(self: *Self, mi: []u8, ci: []const u8) void {
     const ks_bytes = ks.toBytes();
     @memcpy(c_padded[ci.len..], ks_bytes[ci.len..]);
     const c = AesBlock.fromBytes(&c_padded);
-    const m = self.dUpdate(0, c);
+    const m = self.updateDec(0, c);
     self.rol();
     const m_bytes = m.toBytes();
     @memcpy(mi, m_bytes[0..mi.len]);

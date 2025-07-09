@@ -48,7 +48,7 @@ pub fn HiaeX(comptime degree: u7) type {
             s[13 +% i] = s[13 +% i].xorBlocks(a);
         }
 
-        inline fn eUpdate(self: *Self, comptime i: u4, m: AesBlockX) AesBlockX {
+        inline fn updateEnc(self: *Self, comptime i: u4, m: AesBlockX) AesBlockX {
             const s = &self.s;
             const t = aesround(s[0 +% i].xorBlocks(s[1 +% i]), m);
             const c = t.xorBlocks(s[9 +% i]);
@@ -58,7 +58,7 @@ pub fn HiaeX(comptime degree: u7) type {
             return c;
         }
 
-        inline fn dUpdate(self: *Self, comptime i: u4, c: AesBlockX) AesBlockX {
+        inline fn updateDec(self: *Self, comptime i: u4, c: AesBlockX) AesBlockX {
             const s = &self.s;
             const t = c.xorBlocks(s[9 +% i]);
             const m = aesround(s[0 +% i].xorBlocks(s[1 +% i]), t);
@@ -98,13 +98,13 @@ pub fn HiaeX(comptime degree: u7) type {
             const s = &self.s;
             inline for (0..s.len) |i| {
                 const m = AesBlockX.fromBytes(mi[i * blockx_length ..][0..blockx_length]);
-                ci[i * blockx_length ..][0..blockx_length].* = self.eUpdate(@intCast(i), m).toBytes();
+                ci[i * blockx_length ..][0..blockx_length].* = self.updateEnc(@intCast(i), m).toBytes();
             }
         }
 
         fn enc(self: *Self, ci: *[blockx_length]u8, mi: *const [blockx_length]u8) void {
             const m = AesBlockX.fromBytes(mi);
-            ci.* = self.eUpdate(0, m).toBytes();
+            ci.* = self.updateEnc(0, m).toBytes();
             self.rol();
         }
 
@@ -113,14 +113,14 @@ pub fn HiaeX(comptime degree: u7) type {
             const s = &self.s;
             inline for (0..s.len) |i| {
                 const c = AesBlockX.fromBytes(ci[i * blockx_length ..][0..blockx_length]);
-                const m = self.dUpdate(@intCast(i), c);
+                const m = self.updateDec(@intCast(i), c);
                 mi[i * blockx_length ..][0..blockx_length].* = m.toBytes();
             }
         }
 
         fn dec(self: *Self, mi: *[blockx_length]u8, ci: *const [blockx_length]u8) void {
             const c = AesBlockX.fromBytes(ci);
-            const m = self.dUpdate(0, c);
+            const m = self.updateDec(0, c);
             self.rol();
             mi.* = m.toBytes();
         }
@@ -133,7 +133,7 @@ pub fn HiaeX(comptime degree: u7) type {
             const ks_bytes = ks.toBytes();
             @memcpy(c_padded[ci.len..], ks_bytes[ci.len..]);
             const c = AesBlockX.fromBytes(&c_padded);
-            const m = self.dUpdate(0, c);
+            const m = self.updateDec(0, c);
             self.rol();
             const m_bytes = m.toBytes();
             @memcpy(mi, m_bytes[0..mi.len]);
