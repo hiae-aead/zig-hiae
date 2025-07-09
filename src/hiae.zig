@@ -81,7 +81,7 @@ fn absorbBatch(self: *Self, ai: *const [rate]u8) void {
     }
 }
 
-fn absorbOne(self: *Self, ai: *const [block_length]u8) void {
+fn absorb(self: *Self, ai: *const [block_length]u8) void {
     const m = AesBlock.fromBytes(ai);
     self.round(0, m);
     self.rol();
@@ -96,7 +96,7 @@ fn encBatch(self: *Self, ci: *[rate]u8, mi: *const [rate]u8) void {
     }
 }
 
-fn encOne(self: *Self, ci: *[block_length]u8, mi: *const [block_length]u8) void {
+fn enc(self: *Self, ci: *[block_length]u8, mi: *const [block_length]u8) void {
     const m = AesBlock.fromBytes(mi);
     ci.* = self.eRound(0, m).toBytes();
     self.rol();
@@ -112,7 +112,7 @@ fn decBatch(self: *Self, mi: *[rate]u8, ci: *const [rate]u8) void {
     }
 }
 
-fn decOne(self: *Self, mi: *[block_length]u8, ci: *const [block_length]u8) void {
+fn dec(self: *Self, mi: *[block_length]u8, ci: *const [block_length]u8) void {
     const c = AesBlock.fromBytes(ci);
     const m = self.dRound(0, c);
     mi.* = m.toBytes();
@@ -187,13 +187,13 @@ pub fn encrypt(
         hiae.absorbBatch(ad[i..][0..rate]);
     }
     while (i + block_length <= ad.len) : (i += block_length) {
-        hiae.absorbOne(ad[i..][0..block_length]);
+        hiae.absorb(ad[i..][0..block_length]);
     }
     const left = ad.len % block_length;
     if (left > 0) {
         var pad = [_]u8{0} ** block_length;
         @memcpy(pad[0..left], ad[i..]);
-        hiae.absorbOne(&pad);
+        hiae.absorb(&pad);
     }
 
     i = 0;
@@ -201,12 +201,12 @@ pub fn encrypt(
         hiae.encBatch(ct[i..][0..rate], msg[i..][0..rate]);
     }
     while (i + block_length <= msg.len) : (i += block_length) {
-        hiae.encOne(ct[i..][0..block_length], msg[i..][0..block_length]);
+        hiae.enc(ct[i..][0..block_length], msg[i..][0..block_length]);
     }
     if (msg.len % block_length > 0) {
         var pad = [_]u8{0} ** block_length;
         @memcpy(pad[0..msg[i..].len], msg[i..]);
-        hiae.encOne(&pad, &pad);
+        hiae.enc(&pad, &pad);
         @memcpy(ct[i..], pad[0..ct[i..].len]);
     }
 
@@ -231,13 +231,13 @@ pub fn decrypt(
         hiae.absorbBatch(ad[i..][0..rate]);
     }
     while (i + block_length <= ad.len) : (i += block_length) {
-        hiae.absorbOne(ad[i..][0..block_length]);
+        hiae.absorb(ad[i..][0..block_length]);
     }
     const left = ad.len % block_length;
     if (left > 0) {
         var pad = [_]u8{0} ** block_length;
         @memcpy(pad[0..left], ad[i..]);
-        hiae.absorbOne(&pad);
+        hiae.absorb(&pad);
     }
 
     i = 0;
@@ -245,7 +245,7 @@ pub fn decrypt(
         hiae.decBatch(msg[i..][0..rate], ct[i..][0..rate]);
     }
     while (i + block_length <= ct.len) : (i += block_length) {
-        hiae.decOne(msg[i..][0..block_length], ct[i..][0..block_length]);
+        hiae.dec(msg[i..][0..block_length], ct[i..][0..block_length]);
     }
     if (ct.len % block_length > 0) {
         hiae.decLast(msg[i..], ct[i..]);
@@ -271,13 +271,13 @@ pub fn mac(
         hiae.absorbBatch(data[i..][0..rate]);
     }
     while (i + block_length <= data.len) : (i += block_length) {
-        hiae.absorbOne(data[i..][0..block_length]);
+        hiae.absorb(data[i..][0..block_length]);
     }
     const left = data.len % block_length;
     if (left > 0) {
         var pad = [_]u8{0} ** block_length;
         @memcpy(pad[0..left], data[i..]);
-        hiae.absorbOne(&pad);
+        hiae.absorb(&pad);
     }
     return hiae.finalizeMac(data.len);
 }

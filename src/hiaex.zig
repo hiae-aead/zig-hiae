@@ -87,7 +87,7 @@ pub fn HiaeX(comptime degree: u7) type {
             }
         }
 
-        fn absorbOne(self: *Self, ai: *const [blockx_length]u8) void {
+        fn absorb(self: *Self, ai: *const [blockx_length]u8) void {
             const m = AesBlockX.fromBytes(ai);
             self.round(0, m);
             self.rol();
@@ -102,7 +102,7 @@ pub fn HiaeX(comptime degree: u7) type {
             }
         }
 
-        fn encOne(self: *Self, ci: *[blockx_length]u8, mi: *const [blockx_length]u8) void {
+        fn enc(self: *Self, ci: *[blockx_length]u8, mi: *const [blockx_length]u8) void {
             const m = AesBlockX.fromBytes(mi);
             ci.* = self.eRound(0, m).toBytes();
             self.rol();
@@ -118,7 +118,7 @@ pub fn HiaeX(comptime degree: u7) type {
             }
         }
 
-        fn decOne(self: *Self, mi: *[blockx_length]u8, ci: *const [blockx_length]u8) void {
+        fn dec(self: *Self, mi: *[blockx_length]u8, ci: *const [blockx_length]u8) void {
             const c = AesBlockX.fromBytes(ci);
             const m = self.dRound(0, c);
             mi.* = m.toBytes();
@@ -207,7 +207,7 @@ pub fn HiaeX(comptime degree: u7) type {
             var v = [_]u8{0} ** blockx_length;
             for (1..degree) |d| {
                 v[0..16].* = tag_multi_bytes[d * 16 ..][0..16].*;
-                self.absorbOne(&v);
+                self.absorb(&v);
             }
             if (degree > 1) {
                 mem.writeInt(u64, b[0..8], degree, .little);
@@ -237,13 +237,13 @@ pub fn HiaeX(comptime degree: u7) type {
                 hiae.absorbBatch(ad[i..][0..rate]);
             }
             while (i + blockx_length <= ad.len) : (i += blockx_length) {
-                hiae.absorbOne(ad[i..][0..blockx_length]);
+                hiae.absorb(ad[i..][0..blockx_length]);
             }
             const left = ad.len % blockx_length;
             if (left > 0) {
                 var pad = [_]u8{0} ** blockx_length;
                 @memcpy(pad[0..left], ad[i..]);
-                hiae.absorbOne(&pad);
+                hiae.absorb(&pad);
             }
 
             i = 0;
@@ -251,12 +251,12 @@ pub fn HiaeX(comptime degree: u7) type {
                 hiae.encBatch(ct[i..][0..rate], msg[i..][0..rate]);
             }
             while (i + blockx_length <= msg.len) : (i += blockx_length) {
-                hiae.encOne(ct[i..][0..blockx_length], msg[i..][0..blockx_length]);
+                hiae.enc(ct[i..][0..blockx_length], msg[i..][0..blockx_length]);
             }
             if (msg.len % blockx_length > 0) {
                 var pad = [_]u8{0} ** blockx_length;
                 @memcpy(pad[0..msg[i..].len], msg[i..]);
-                hiae.encOne(&pad, &pad);
+                hiae.enc(&pad, &pad);
                 @memcpy(ct[i..], pad[0..ct[i..].len]);
             }
 
@@ -281,13 +281,13 @@ pub fn HiaeX(comptime degree: u7) type {
                 hiae.absorbBatch(ad[i..][0..rate]);
             }
             while (i + blockx_length <= ad.len) : (i += blockx_length) {
-                hiae.absorbOne(ad[i..][0..blockx_length]);
+                hiae.absorb(ad[i..][0..blockx_length]);
             }
             const left = ad.len % blockx_length;
             if (left > 0) {
                 var pad = [_]u8{0} ** blockx_length;
                 @memcpy(pad[0..left], ad[i..]);
-                hiae.absorbOne(&pad);
+                hiae.absorb(&pad);
             }
 
             i = 0;
@@ -295,7 +295,7 @@ pub fn HiaeX(comptime degree: u7) type {
                 hiae.decBatch(msg[i..][0..rate], ct[i..][0..rate]);
             }
             while (i + blockx_length <= ct.len) : (i += blockx_length) {
-                hiae.decOne(msg[i..][0..blockx_length], ct[i..][0..blockx_length]);
+                hiae.dec(msg[i..][0..blockx_length], ct[i..][0..blockx_length]);
             }
             if (ct.len % blockx_length > 0) {
                 hiae.decLast(msg[i..], ct[i..]);
@@ -321,13 +321,13 @@ pub fn HiaeX(comptime degree: u7) type {
                 hiae.absorbBatch(data[i..][0..rate]);
             }
             while (i + blockx_length <= data.len) : (i += blockx_length) {
-                hiae.absorbOne(data[i..][0..blockx_length]);
+                hiae.absorb(data[i..][0..blockx_length]);
             }
             const left = data.len % blockx_length;
             if (left > 0) {
                 var pad = [_]u8{0} ** blockx_length;
                 @memcpy(pad[0..left], data[i..]);
-                hiae.absorbOne(&pad);
+                hiae.absorb(&pad);
             }
             return hiae.finalizeMac(data.len);
         }
