@@ -32,7 +32,7 @@ fn benchHiae(comptime desc: []const u8, comptime Aead: type) !void {
     const bits: f128 = @floatFromInt(@as(u128, msg_len) * iterations * 8);
     const elapsed_s = @as(f128, @floatFromInt(end - start)) / time.ns_per_s;
     const throughput = @as(f64, @floatCast(bits / (elapsed_s * 1000_000_000)));
-    const stdout = std.io.getStdOut().writer();
+    const stdout = std.fs.File.stdout().deprecatedWriter();
     try stdout.print("{s}\t{d:10.1} Gb/s\n", .{ desc, throughput });
 }
 
@@ -56,7 +56,7 @@ fn benchHiaeMac(desc: []const u8, comptime Aead: type) !void {
     const bits: f128 = @floatFromInt(@as(u128, msg_len) * iterations * 8);
     const elapsed_s = @as(f128, @floatFromInt(end - start)) / time.ns_per_s;
     const throughput = @as(f64, @floatCast(bits / (elapsed_s * 1000_000_000)));
-    const stdout = std.io.getStdOut().writer();
+    const stdout = std.fs.File.stdout().deprecatedWriter();
     try stdout.print("{s}\t{d:10.1} Gb/s\n", .{ desc, throughput });
 }
 
@@ -84,7 +84,7 @@ fn benchLeMac() !void {
     const bits: f128 = @floatFromInt(@as(u128, msg_len) * iterations * 8);
     const elapsed_s = @as(f128, @floatFromInt(end - start)) / time.ns_per_s;
     const throughput = @as(f64, @floatCast(bits / (elapsed_s * 1000_000_000)));
-    const stdout = std.io.getStdOut().writer();
+    const stdout = std.fs.File.stdout().deprecatedWriter();
     try stdout.print("LeMAC\t{d:10.1} Gb/s\n", .{throughput});
 }
 
