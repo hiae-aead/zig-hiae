@@ -302,8 +302,8 @@ pub fn HiaeX(comptime degree: u7) type {
             }
 
             const expected_tag = hiae.finalize(ad.len, msg.len);
-            if (!crypto.utils.timingSafeEql([expected_tag.len]u8, expected_tag, tag)) {
-                crypto.utils.secureZero(u8, msg);
+            if (!crypto.timing_safe.eql([expected_tag.len]u8, expected_tag, tag)) {
+                crypto.secureZero(u8, msg);
                 return error.AuthenticationFailed;
             }
         }
