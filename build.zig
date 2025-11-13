@@ -12,7 +12,6 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/lib.zig"),
         .target = target,
         .optimize = optimize,
-        .strip = true,
     });
 
     const exe_mod = b.createModule(.{
