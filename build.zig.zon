@@ -1,6 +1,6 @@
 .{
     .name = .hiae,
-    .version = "0.0.0",
+    .version = "0.2.0",
     .minimum_zig_version = "0.15.1",
     .fingerprint = 0xd9ee3f6e5a9eb4f4,
 
