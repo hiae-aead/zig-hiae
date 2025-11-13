@@ -68,12 +68,13 @@ pub fn HiaeX(comptime degree: u7) type {
             return m;
         }
 
-        inline fn diffusionRounds(self: *Self, m: AesBlockX) void {
+        inline fn diffusionRounds(self: *Self, x0: AesBlockX, x1: AesBlockX) void {
             @setEvalBranchQuota(10000);
             const s = &self.s;
-            for (0..2) |_| {
+            inline for (0..2) |_| {
                 inline for (0..s.len) |i| {
-                    self.update(@intCast(i), m);
+                    const val = if (i % 2 == 0) x0 else x1;
+                    self.update(@intCast(i), val);
                 }
             }
         }
@@ -155,17 +156,15 @@ pub fn HiaeX(comptime degree: u7) type {
                 break :ctx_v AesBlockX.fromBytes(&contexts_bytes);
             };
             var self = Self{ .s = State{
-                c0_v,                    k1_v,                    nonce_v, c0_v,
-                zero_v,                  nonce_v.xorBlocks(k0_v), zero_v,  c1_v,
-                nonce_v.xorBlocks(k1_v), zero_v,                  k1_v,    c0_v,
-                c1_v,                    k1_v,                    zero_v,  c0_v.xorBlocks(c1_v),
+                c0_v,   k0_v,   c0_v,                    nonce_v,
+                zero_v, k0_v,   zero_v,                  c1_v,
+                k1_v,   zero_v, nonce_v.xorBlocks(k1_v), c0_v,
+                c1_v,   k1_v,   zero_v,                  c0_v.xorBlocks(c1_v),
             } };
             if (degree > 1) {
                 for (&self.s) |*x| x.* = x.*.xorBlocks(ctx_v);
             }
-            self.diffusionRounds(c0_v);
-            self.s[9] = self.s[9].xorBlocks(k0_v);
-            self.s[13] = self.s[13].xorBlocks(k1_v);
+            self.diffusionRounds(k0_v, k1_v);
 
             return self;
         }
@@ -179,7 +178,7 @@ pub fn HiaeX(comptime degree: u7) type {
                 b[i * 16 ..][0..16].* = b[0..16].*;
             }
             const t = AesBlockX.fromBytes(&b);
-            self.diffusionRounds(t);
+            self.diffusionRounds(t, t);
             var tag_multi = s[0];
             for (s[1..]) |x| tag_multi = tag_multi.xorBlocks(x);
             const tag_multi_bytes = tag_multi.toBytes();
@@ -200,7 +199,8 @@ pub fn HiaeX(comptime degree: u7) type {
             for (1..degree) |i| {
                 b[i * 16 ..][0..16].* = b[0..16].*;
             }
-            self.diffusionRounds(AesBlockX.fromBytes(&b));
+            const t = AesBlockX.fromBytes(&b);
+            self.diffusionRounds(t, t);
             var tag_multi = s[0];
             for (s[1..]) |x| tag_multi = tag_multi.xorBlocks(x);
             const tag_multi_bytes = tag_multi.toBytes();
@@ -212,7 +212,8 @@ pub fn HiaeX(comptime degree: u7) type {
             if (degree > 1) {
                 mem.writeInt(u64, b[0..8], degree, .little);
                 mem.writeInt(u64, b[8..16], tag_length * 8, .little);
-                self.diffusionRounds(AesBlockX.fromBytes(&b));
+                const t2 = AesBlockX.fromBytes(&b);
+                self.diffusionRounds(t2, t2);
             }
             tag_multi = s[0];
             for (s[1..]) |x| tag_multi = tag_multi.xorBlocks(x);

@@ -62,12 +62,13 @@ inline fn updateDec(self: *Self, comptime i: u4, c: AesBlock) AesBlock {
     return m;
 }
 
-inline fn diffusionRounds(self: *Self, m: AesBlock) void {
+inline fn diffusionRounds(self: *Self, x0: AesBlock, x1: AesBlock) void {
     @setEvalBranchQuota(10000);
     const s = &self.s;
-    for (0..2) |_| {
+    inline for (0..2) |_| {
         inline for (0..s.len) |i| {
-            self.update(@intCast(i), m);
+            const val = if (i % 2 == 0) x0 else x1;
+            self.update(@intCast(i), val);
         }
     }
 }
@@ -141,14 +142,12 @@ fn init(key: [key_length]u8, nonce: [nonce_length]u8) Self {
     const nonce_v = AesBlock.fromBytes(&nonce);
     const zero_v = AesBlock.fromBytes(&[_]u8{0x00} ** 16);
     var self = Self{ .s = State{
-        c0_v,                    k1_v,                    nonce_v, c0_v,
-        zero_v,                  nonce_v.xorBlocks(k0_v), zero_v,  c1_v,
-        nonce_v.xorBlocks(k1_v), zero_v,                  k1_v,    c0_v,
-        c1_v,                    k1_v,                    zero_v,  c0_v.xorBlocks(c1_v),
+        c0_v,   k0_v,   c0_v,                    nonce_v,
+        zero_v, k0_v,   zero_v,                  c1_v,
+        k1_v,   zero_v, nonce_v.xorBlocks(k1_v), c0_v,
+        c1_v,   k1_v,   zero_v,                  c0_v.xorBlocks(c1_v),
     } };
-    self.diffusionRounds(c0_v);
-    self.s[9] = self.s[9].xorBlocks(k0_v);
-    self.s[13] = self.s[13].xorBlocks(k1_v);
+    self.diffusionRounds(k0_v, k1_v);
 
     return self;
 }
@@ -159,7 +158,7 @@ fn finalize(self: *Self, ad_len: usize, msg_len: usize) [tag_length]u8 {
     mem.writeInt(u64, b[0..8], @as(u64, ad_len) * 8, .little);
     mem.writeInt(u64, b[8..16], @as(u64, msg_len) * 8, .little);
     const t = AesBlock.fromBytes(&b);
-    self.diffusionRounds(t);
+    self.diffusionRounds(t, t);
     var tag = s[0];
     for (s[1..]) |x| tag = tag.xorBlocks(x);
     return tag.toBytes();
