@@ -3,6 +3,7 @@ const mem = std.mem;
 const random = std.crypto.random;
 const time = std.time;
 const Timer = std.time.Timer;
+const Io = std.Io;
 
 const hiae = @import("lib.zig");
 
@@ -32,10 +33,11 @@ fn benchHiae(comptime desc: []const u8, comptime Aead: type) !void {
     const bits: f128 = @floatFromInt(@as(u128, msg_len) * iterations * 8);
     const elapsed_s = @as(f128, @floatFromInt(end - start)) / time.ns_per_s;
     const throughput = @as(f64, @floatCast(bits / (elapsed_s * 1000_000_000)));
-    const stdout_file = std.fs.File.stdout();
+    const io = Io.Threaded.global_single_threaded.io();
+    const stdout = Io.File.stdout();
     const output = try std.fmt.allocPrint(std.heap.page_allocator, "{s}\t{d:10.1} Gb/s\n", .{ desc, throughput });
     defer std.heap.page_allocator.free(output);
-    try stdout_file.writeAll(output);
+    try stdout.writeStreamingAll(io, output);
 }
 
 fn benchHiaeMac(desc: []const u8, comptime Aead: type) !void {
@@ -58,10 +60,11 @@ fn benchHiaeMac(desc: []const u8, comptime Aead: type) !void {
     const bits: f128 = @floatFromInt(@as(u128, msg_len) * iterations * 8);
     const elapsed_s = @as(f128, @floatFromInt(end - start)) / time.ns_per_s;
     const throughput = @as(f64, @floatCast(bits / (elapsed_s * 1000_000_000)));
-    const stdout_file = std.fs.File.stdout();
+    const io = Io.Threaded.global_single_threaded.io();
+    const stdout = Io.File.stdout();
     const output = try std.fmt.allocPrint(std.heap.page_allocator, "{s}\t{d:10.1} Gb/s\n", .{ desc, throughput });
     defer std.heap.page_allocator.free(output);
-    try stdout_file.writeAll(output);
+    try stdout.writeStreamingAll(io, output);
 }
 
 fn benchLeMac() !void {
@@ -88,10 +91,11 @@ fn benchLeMac() !void {
     const bits: f128 = @floatFromInt(@as(u128, msg_len) * iterations * 8);
     const elapsed_s = @as(f128, @floatFromInt(end - start)) / time.ns_per_s;
     const throughput = @as(f64, @floatCast(bits / (elapsed_s * 1000_000_000)));
-    const stdout_file = std.fs.File.stdout();
+    const io = Io.Threaded.global_single_threaded.io();
+    const stdout = Io.File.stdout();
     const output = try std.fmt.allocPrint(std.heap.page_allocator, "LeMAC\t{d:10.1} Gb/s\n", .{throughput});
     defer std.heap.page_allocator.free(output);
-    try stdout_file.writeAll(output);
+    try stdout.writeStreamingAll(io, output);
 }
 
 pub fn main() !void {
