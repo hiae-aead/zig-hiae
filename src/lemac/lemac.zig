@@ -127,7 +127,7 @@ pub const LeMac = struct {
 
         for (0..10) |round| {
             for (&x, 0..) |*a, j| {
-                a.* = a.xorBlocks(AesBlock.fromBytes(&self.k_final[round + j])).encrypt(zeroblock);
+                a.* = a.*.xorBlocks(AesBlock.fromBytes(&self.k_final[round + j])).encrypt(zeroblock);
             }
         }
         var h = x[0];
@@ -154,7 +154,7 @@ test {
     const nonce: [16]u8 = [_]u8{0} ** 16;
     const msg = [_]u8{0x02} ** 100;
     const expected_tag: [16]u8 = [_]u8{ 221, 165, 166, 236, 201, 150, 215, 101, 227, 154, 25, 74, 2, 162, 227, 115 };
-    var st = LeMac.init(key);
+    const st = LeMac.init(key);
     const tag: [16]u8 = st.mac(&msg, nonce);
     try std.testing.expectEqualSlices(u8, &expected_tag, &tag);
 }

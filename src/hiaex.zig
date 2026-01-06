@@ -1,4 +1,4 @@
-//! HiAE ipmlementation with support for parallelism.
+//! HiAE implementation with support for parallelism.
 //! Note that when degree=1, this is equivalent to the HiAE implementation in `hiae.zig`.
 
 const std = @import("std");
