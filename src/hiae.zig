@@ -122,7 +122,7 @@ fn dec(self: *Self, mi: *[block_length]u8, ci: *const [block_length]u8) void {
 
 fn decPartial(self: *Self, mi: []u8, ci: []const u8) void {
     const s = &self.s;
-    var c_padded = [_]u8{0} ** block_length;
+    var c_padded: [block_length]u8 = @splat(0);
     @memcpy(c_padded[0..ci.len], ci);
     const ks = aesround(s[0].xorBlocks(s[1]), AesBlock.fromBytes(&c_padded)).xorBlocks(s[9]);
     const ks_bytes = ks.toBytes();
@@ -140,7 +140,7 @@ fn init(key: [key_length]u8, nonce: [nonce_length]u8) Self {
     const k0_v = AesBlock.fromBytes(&key[0..16].*);
     const k1_v = AesBlock.fromBytes(&key[16..].*);
     const nonce_v = AesBlock.fromBytes(&nonce);
-    const zero_v = AesBlock.fromBytes(&[_]u8{0x00} ** 16);
+    const zero_v = AesBlock.fromBytes(&@as([16]u8, @splat(0x00)));
     var self = Self{ .s = State{
         c0_v,   k0_v,   c0_v,                    nonce_v,
         zero_v, k0_v,   zero_v,                  c1_v,
@@ -190,7 +190,7 @@ pub fn encrypt(
     }
     const left = ad.len % block_length;
     if (left > 0) {
-        var pad = [_]u8{0} ** block_length;
+        var pad: [block_length]u8 = @splat(0);
         @memcpy(pad[0..left], ad[i..]);
         hiae.absorb(&pad);
     }
@@ -203,7 +203,7 @@ pub fn encrypt(
         hiae.enc(ct[i..][0..block_length], msg[i..][0..block_length]);
     }
     if (msg.len % block_length > 0) {
-        var pad = [_]u8{0} ** block_length;
+        var pad: [block_length]u8 = @splat(0);
         @memcpy(pad[0..msg[i..].len], msg[i..]);
         hiae.enc(&pad, &pad);
         @memcpy(ct[i..], pad[0..ct[i..].len]);
@@ -234,7 +234,7 @@ pub fn decrypt(
     }
     const left = ad.len % block_length;
     if (left > 0) {
-        var pad = [_]u8{0} ** block_length;
+        var pad: [block_length]u8 = @splat(0);
         @memcpy(pad[0..left], ad[i..]);
         hiae.absorb(&pad);
     }
@@ -274,7 +274,7 @@ pub fn mac(
     }
     const left = data.len % block_length;
     if (left > 0) {
-        var pad = [_]u8{0} ** block_length;
+        var pad: [block_length]u8 = @splat(0);
         @memcpy(pad[0..left], data[i..]);
         hiae.absorb(&pad);
     }

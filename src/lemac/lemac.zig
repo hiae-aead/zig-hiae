@@ -48,7 +48,7 @@ pub const LeMac = struct {
     }
 
     pub fn mac(self: *const LeMac, msg: []const u8, nonce: [16]u8) [16]u8 {
-        const zeroblock = AesBlock.fromBytes(&([_]u8{0} ** 16));
+        const zeroblock = AesBlock.fromBytes(&@as([16]u8, @splat(0)));
 
         // UHF
         var x: [9]AesBlock = undefined;
@@ -82,7 +82,7 @@ pub const LeMac = struct {
             rr = m2;
         }
         const left = msg.len - i;
-        var pad = [_]u8{0} ** 64;
+        var pad: [64]u8 = @splat(0);
         @memcpy(pad[0..left], msg[i..]);
         pad[left] = 0x80;
         {
@@ -151,8 +151,8 @@ pub const LeMac = struct {
 
 test {
     const key: [16]u8 = [_]u8{ 0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c };
-    const nonce: [16]u8 = [_]u8{0} ** 16;
-    const msg = [_]u8{0x02} ** 100;
+    const nonce: [16]u8 = @splat(0);
+    const msg: [100]u8 = @splat(0x02);
     const expected_tag: [16]u8 = [_]u8{ 221, 165, 166, 236, 201, 150, 215, 101, 227, 154, 25, 74, 2, 162, 227, 115 };
     const st = LeMac.init(key);
     const tag: [16]u8 = st.mac(&msg, nonce);

@@ -33,6 +33,14 @@ pub fn HiaeX(comptime degree: u7) type {
             return in.encrypt(rk);
         }
 
+        fn repeatBlock(block: [16]u8) [16 * degree]u8 {
+            var out: [16 * degree]u8 = undefined;
+            inline for (0..degree) |i| {
+                out[i * 16 ..][0..16].* = block;
+            }
+            return out;
+        }
+
         inline fn rol(self: *Self) void {
             const s = &self.s;
             const t = s[0];
@@ -128,7 +136,7 @@ pub fn HiaeX(comptime degree: u7) type {
 
         fn decPartial(self: *Self, mi: []u8, ci: []const u8) void {
             const s = &self.s;
-            var c_padded = [_]u8{0} ** blockx_length;
+            var c_padded: [blockx_length]u8 = @splat(0);
             @memcpy(c_padded[0..ci.len], ci);
             const ks = aesround(s[0].xorBlocks(s[1]), AesBlockX.fromBytes(&c_padded)).xorBlocks(s[9]);
             const ks_bytes = ks.toBytes();
@@ -141,14 +149,16 @@ pub fn HiaeX(comptime degree: u7) type {
         }
 
         fn init(key: [key_length]u8, nonce: [nonce_length]u8) Self {
-            const c0_v = AesBlockX.fromBytes(&[16]u8{ 0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34 } ** degree);
-            const c1_v = AesBlockX.fromBytes(&[16]u8{ 0x4a, 0x40, 0x93, 0x82, 0x22, 0x99, 0xf3, 0x1d, 0x00, 0x82, 0xef, 0xa9, 0x8e, 0xc4, 0xe6, 0xc8 } ** degree);
-            const k0_v = AesBlockX.fromBytes(&(key[0..16].* ** degree));
-            const k1_v = AesBlockX.fromBytes(&(key[16..].* ** degree));
-            const nonce_v = AesBlockX.fromBytes(&(nonce ** degree));
-            const zero_v = AesBlockX.fromBytes(&[_]u8{0x00} ** (16 * degree));
+            const c0_bytes: [16]u8 = .{ 0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34 };
+            const c1_bytes: [16]u8 = .{ 0x4a, 0x40, 0x93, 0x82, 0x22, 0x99, 0xf3, 0x1d, 0x00, 0x82, 0xef, 0xa9, 0x8e, 0xc4, 0xe6, 0xc8 };
+            const c0_v = AesBlockX.fromBytes(&repeatBlock(c0_bytes));
+            const c1_v = AesBlockX.fromBytes(&repeatBlock(c1_bytes));
+            const k0_v = AesBlockX.fromBytes(&repeatBlock(key[0..16].*));
+            const k1_v = AesBlockX.fromBytes(&repeatBlock(key[16..].*));
+            const nonce_v = AesBlockX.fromBytes(&repeatBlock(nonce));
+            const zero_v = AesBlockX.fromBytes(&@as([16 * degree]u8, @splat(0x00)));
             const ctx_v = ctx_v: {
-                var contexts_bytes = [_]u8{0} ** blockx_length;
+                var contexts_bytes: [blockx_length]u8 = @splat(0);
                 for (0..degree) |i| {
                     contexts_bytes[i * 16] = @intCast(i);
                     contexts_bytes[i * 16 + 1] = @intCast(degree - 1);
@@ -204,7 +214,7 @@ pub fn HiaeX(comptime degree: u7) type {
             var tag_multi = s[0];
             for (s[1..]) |x| tag_multi = tag_multi.xorBlocks(x);
             const tag_multi_bytes = tag_multi.toBytes();
-            var v = [_]u8{0} ** blockx_length;
+            var v: [blockx_length]u8 = @splat(0);
             for (1..degree) |d| {
                 v[0..16].* = tag_multi_bytes[d * 16 ..][0..16].*;
                 self.absorb(&v);
@@ -242,7 +252,7 @@ pub fn HiaeX(comptime degree: u7) type {
             }
             const left = ad.len % blockx_length;
             if (left > 0) {
-                var pad = [_]u8{0} ** blockx_length;
+                var pad: [blockx_length]u8 = @splat(0);
                 @memcpy(pad[0..left], ad[i..]);
                 hiae.absorb(&pad);
             }
@@ -255,7 +265,7 @@ pub fn HiaeX(comptime degree: u7) type {
                 hiae.enc(ct[i..][0..blockx_length], msg[i..][0..blockx_length]);
             }
             if (msg.len % blockx_length > 0) {
-                var pad = [_]u8{0} ** blockx_length;
+                var pad: [blockx_length]u8 = @splat(0);
                 @memcpy(pad[0..msg[i..].len], msg[i..]);
                 hiae.enc(&pad, &pad);
                 @memcpy(ct[i..], pad[0..ct[i..].len]);
@@ -286,7 +296,7 @@ pub fn HiaeX(comptime degree: u7) type {
             }
             const left = ad.len % blockx_length;
             if (left > 0) {
-                var pad = [_]u8{0} ** blockx_length;
+                var pad: [blockx_length]u8 = @splat(0);
                 @memcpy(pad[0..left], ad[i..]);
                 hiae.absorb(&pad);
             }
@@ -326,7 +336,7 @@ pub fn HiaeX(comptime degree: u7) type {
             }
             const left = data.len % blockx_length;
             if (left > 0) {
-                var pad = [_]u8{0} ** blockx_length;
+                var pad: [blockx_length]u8 = @splat(0);
                 @memcpy(pad[0..left], data[i..]);
                 hiae.absorb(&pad);
             }
